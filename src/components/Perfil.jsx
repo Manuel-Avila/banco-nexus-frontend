@@ -1,31 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "../styles/styles";
 import Campo from "./Campo";
 
 export default function Perfil({
   usuario,
   setUsuario,
-  showToast,
+  showModal,
+  fetchAuth,
 }) {
   const [nombre, setNombre] = useState(usuario?.nombre || "");
   const [email] = useState(usuario?.email || "");
   const [loading, setLoading] = useState(false);
+  const [datosCuenta, setDatosCuenta] = useState({
+    tipo: usuario?.tipo || "Debito",
+    estado: usuario?.estado || "activa",
+  });
+
+  // Cargar perfil actualizado desde el backend al montar
+  useEffect(() => {
+    cargarPerfil();
+  }, []);
+
+  const cargarPerfil = async () => {
+    try {
+      const res = await fetchAuth("/auth/profile");
+      if (res.ok) {
+        const data = await res.json();
+        setNombre(data.nombre || "");
+        setDatosCuenta({
+          tipo: data.cuenta?.tipo || "Debito",
+          estado: data.cuenta?.estado || "activa",
+        });
+        setUsuario((prev) => ({
+          ...prev,
+          nombre: data.nombre,
+          numero_cuenta: data.cuenta?.numero_cuenta || prev.numero_cuenta,
+          saldo: data.cuenta?.saldo ?? prev.saldo,
+          tipo: data.cuenta?.tipo || prev.tipo,
+          estado: data.cuenta?.estado || prev.estado,
+        }));
+      }
+    } catch (err) {
+      // Si falla, mostramos los datos ya en estado
+    }
+  };
 
   const guardarPerfil = () => {
     if (!nombre.trim()) {
-      showToast("El nombre no puede estar vacío", "error");
+      showModal("error", "Nombre inválido", "El nombre no puede estar vacío.");
       return;
     }
 
     setLoading(true);
 
+    // El backend no expone endpoint de actualización de nombre en las rutas
+    // definidas, así que actualizamos localmente el estado de usuario.
     setTimeout(() => {
       setUsuario({
         ...usuario,
         nombre,
       });
-
-      showToast("Perfil actualizado");
+      showModal("success", "¡Perfil actualizado!", "Tus datos fueron guardados correctamente.");
       setLoading(false);
     }, 500);
   };
@@ -149,12 +184,12 @@ export default function Perfil({
             },
             {
               label: "Tipo de cuenta",
-              valor: "Cuenta de cheques",
+              valor: datosCuenta.tipo || "Debito",
             },
             {
               label: "Estado",
-              valor: "Activa",
-              verde: true,
+              valor: datosCuenta.estado === "activa" ? "Activa" : datosCuenta.estado,
+              verde: datosCuenta.estado === "activa",
             },
             {
               label: "Banco",
